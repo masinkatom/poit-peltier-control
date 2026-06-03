@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitorovanie a Riadenie Peltierovho okruhu</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f6f8;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        h2 {
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 25px;
+            font-weight: bold;
+        }
+        /* Horné widgety */
+        .grid-boxes {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .box {
+            background-color: #ebf0f5;
+            padding: 15px;
+            text-align: center;
+            border-radius: 8px;
+        }
+        .box-title {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 5px;
+        }
+        .box-value {
+            font-size: 22px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        /* Info riadok */
+        .info-bar {
+            background-color: #f1f3f5;
+            text-align: center;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 25px;
+            font-size: 14px;
+        }
+        /* Graf */
+        .chart-container {
+            position: relative;
+            margin-bottom: 30px;
+            width: 100%;
+            height: 300px;
+        }
+        hr {
+            border: 0;
+            height: 1px;
+            background: #ddd;
+            margin: 30px 0;
+        }
+        /* Konfigurácia */
+        .config-section {
+            text-align: center;
+        }
+        .config-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 450px;
+            margin: 0 auto 15px auto;
+        }
+        .form-group label {
+            font-size: 16px;
+            text-align: left;
+            flex: 1;
+        }
+        .form-group input {
+            width: 130px;
+            padding: 8px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            text-align: center;
+        }
+        /* Tlačidlá */
+        .btn-submit {
+            width: 100%;
+            max-width: 450px;
+            background-color: #ffb703;
+            color: black;
+            border: none;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 20px 0;
+            transition: background 0.2s;
+        }
+        .btn-submit:hover {
+            background-color: #fb8500;
+        }
+        .button-group {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .btn-action {
+            padding: 10px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            min-width: 90px;
+        }
+        .btn-open  { background-color: #00afb9; }
+        .btn-start { background-color: #2a9d8f; }
+        .btn-stop  { background-color: #e63946; }
+        .btn-close { background-color: #6c757d; }
+        
+        /* Status text */
+        .status-text {
+            text-align: center;
+            margin-top: 25px;
+            font-weight: bold;
+            font-size: 16px;
+            color: #2a9d8f;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Monitorovanie a Riadenie Peltierovho okruhu</h2>
+
+    <div class="grid-boxes">
+        <div class="box">
+            <div class="box-title">Aktuálna Teplota</div>
+            <div class="box-value" id="live_teplota">--.- °C</div>
+        </div>
+        <div class="box">
+            <div class="box-title">Výkon Peltier (PWM)</div>
+            <div class="box-value" id="live_pwm">0</div>
+        </div>
+        <div class="box">
+            <div class="box-title">Stav systému</div>
+            <div class="box-value" id="live_stav">STOP</div>
+        </div>
+    </div>
+
+    <div class="info-bar">
+        Aktuálne v ESP32 -> Kp: <span id="live_kp">--</span> | Ki: <span id="live_ki">--</span>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="peltierChart"></canvas>
+    </div>
+
+    <hr>
+
+    <div class="config-section">
+        <div class="config-title">Konfigurácia parametrov</div>
+        
+        <div class="form-group">
+            <label>Cieľová teplota (°C):</label>
+            <input type="number" id="input_setpoint" value="24" step="0.5">
+        </div>
+        <div class="form-group">
+            <label>Proporcionálna (Kp):</label>
+            <input type="number" id="input_kp" value="50">
+        </div>
+        <div class="form-group">
+            <label>Integračná (Ki):</label>
+            <input type="number" id="input_ki" value="0.4" step="0.1">
+        </div>
+
+        <button class="btn-submit" onclick="ulozitHodnoty()">💾 Uložiť hodnoty</button>
+
+        <div class="button-group">
+            <button class="btn-action btn-open" onclick="poslatPrikaz('OPEN')">OPEN</button>
+            <button class="btn-action btn-start" onclick="poslatPrikaz('START')">START</button>
+            <button class="btn-action btn-stop" onclick="poslatPrikaz('STOP')">STOP</button>
+            <button class="btn-action btn-close" onclick="poslatPrikaz('CLOSE')">CLOSE</button>
+        </div>
+
+        <div class="status-text" id="status_msg">Status: Pripravený</div>
+    </div>
+</div>
+
+<script>
+    const socket = io();
+    let globalSetpoint = 24;
+
+    // ============================================================
+    // INICIALIZÁCIA CHART.JS GRAFU
+    // ============================================================
+    const ctx = document.getElementById('peltierChart').getContext('2d');
+    const peltierChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [], 
+            datasets: [
+                {
+                    label: 'Aktuálna Teplota (°C)',
+                    data: [],
+                    borderColor: '#007bff',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    tension: 0.2
+                },
+                {
+                    label: 'Cieľová Teplota (°C)',
+                    data: [],
+                    borderColor: '#e63946',
+                    borderDash: [5, 5],
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    min: 14,
+                    max: 32,
+                    title: { display: true, text: 'Teplota (°C)' }
+                },
+                x: {
+                    title: { display: true, text: 'Čas' }
+                }
+            }
+        }
+    });
+
+    // ============================================================
+    // PRIJÍMANIE LIVE DÁT CEZ WEBSOCKETS (Z FLASKU)
+    // ============================================================
+    socket.on('aktualne_data', function(data) {
+        console.log("Prijaté dáta z ESP32:", data);
+        
+        // 1. Tieto systémové stavy sa aktualizujú VŽDY (chceme okamžite vidieť stav CLOSE a PWM 0)
+        if (data.peltier_pwm !== undefined) {
+            document.getElementById('live_pwm').innerText = data.peltier_pwm;
+        }
+        if (data.stav_systemu !== undefined) {
+            document.getElementById('live_stav').innerText = data.stav_systemu;
+        }
+        if (data.kp !== undefined) {
+            document.getElementById('live_kp').innerText = data.kp;
+        }
+        if (data.ki !== undefined) {
+            document.getElementById('live_ki').innerText = data.ki;
+        }
+        if (data.setpoint !== undefined) {
+            globalSetpoint = parseFloat(data.setpoint);
+        }
+
+        // ============================================================
+        // ZAMRZNUTIE GRAFU A TEPLOTY: SPUSTÍ SA IBA AK NIE JE STAV "CLOSE"
+        // ============================================================
+        if (data.stav_systemu !== "CLOSE") {
+            
+            // A. Aktualizácia boxu teploty (ak beží OPEN/START/STOP)
+            if (data.teplota !== undefined) {
+                document.getElementById('live_teplota').innerText = parseFloat(data.teplota).toFixed(2) + " °C";
+            }
+
+            // B. Aktualizácia bodov v grafe
+            const teraz = new Date().toLocaleTimeString();
+
+            if (peltierChart.data.labels.length > 20) {
+                peltierChart.data.labels.shift();
+                peltierChart.data.datasets[0].data.shift(); 
+                peltierChart.data.datasets[1].data.shift(); 
+            }
+
+            peltierChart.data.labels.push(teraz);
+            peltierChart.data.datasets[0].data.push(parseFloat(data.teplota));
+            peltierChart.data.datasets[1].data.push(globalSetpoint);
+            
+            peltierChart.update();
+        } else {
+            console.log("Vizuálna vrstva (box teploty aj graf) je kompletne pozastavená.");
+        }
+    });
+
+    // ============================================================
+    // ODOSIELANIE PARAMETROV (Tlačidlo Uložiť)
+    // ============================================================
+    function ulozitHodnoty() {
+        const setpointVal = parseFloat(document.getElementById('input_setpoint').value);
+        const kpVal = parseFloat(document.getElementById('input_kp').value);
+        const kiVal = parseFloat(document.getElementById('input_ki').value);
+
+        globalSetpoint = setpointVal;
+
+        const payload = {
+            setpoint: setpointVal,
+            kp: kpVal,
+            ki: kiVal
+        };
+
+        document.getElementById('status_msg').innerText = "Odosielam parametre...";
+
+        fetch('/odosli_prikaz', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.status === 'ok') {
+                document.getElementById('status_msg').innerText = "Status: Parametre úspešne uložené v ESP32!";
+            } else {
+                document.getElementById('status_msg').innerText = "Status: Chyba príkazu: " + data.sprava;
+            }
+        })
+        .catch(err => {
+            document.getElementById('status_msg').innerText = "Status: ESP32 neodpovedá.";
+            console.error(err);
+        });
+    }
+
+    // ============================================================
+    // ODOSIELANIE AKČNÝCH PRÍKAZOV (OPEN, START, STOP, CLOSE)
+    // ============================================================
+    function poslatPrikaz(prikazMeno) {
+        const payload = {
+            prikaz: prikazMeno
+        };
+
+        document.getElementById('status_msg').innerText = "Posielam príkaz " + prikazMeno + "...";
+
+        fetch('/odosli_prikaz', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.status === 'ok') {
+                document.getElementById('status_msg').innerText = "Status: Stav zmenený na: " + prikazMeno;
+                if(prikazMeno !== "CLOSE") {
+                    document.getElementById('live_stav').innerText = prikazMeno;
+                }
+            } else {
+                document.getElementById('status_msg').innerText = "Status: Chyba: " + data.sprava;
+            }
+        })
+        .catch(err => {
+            document.getElementById('status_msg').innerText = "Status: Server/ESP nereaguje.";
+            console.error(err);
+        });
+    }
+</script>
+
+</body>
+</html>
