@@ -1,0 +1,6 @@
+// potrebne veci
+sudo pip3 install eventlet - sfunkcnenie websocketu na pios
+
+// spustenie servera
+sudo python3 app.py
+
