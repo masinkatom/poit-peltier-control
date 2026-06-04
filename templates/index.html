@@ -20,7 +20,7 @@
             align-items: center;
         }
         .container {
-            max-width: 800px;
+            max-width: 1100px;
             width: 100%;
             background: white;
             padding: 25px;
@@ -33,7 +33,6 @@
             margin-bottom: 25px;
             font-weight: bold;
         }
-        /* Horné widgety */
         .grid-boxes {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -56,7 +55,6 @@
             font-weight: bold;
             color: #007bff;
         }
-        /* Info riadok */
         .info-bar {
             background-color: #f1f3f5;
             text-align: center;
@@ -65,20 +63,74 @@
             margin-bottom: 25px;
             font-size: 14px;
         }
-        /* Graf */
-        .chart-container {
-            position: relative;
+        
+        /* Hlavný riadok: Graf vľavo, budíky vpravo */
+        .visualization-row {
+            display: flex;
+            align-items: stretch;
+            justify-content: space-between;
+            gap: 25px;
             margin-bottom: 30px;
             width: 100%;
-            height: 300px;
         }
+
+        /* Veľkosť grafu */
+        .chart-container {
+            position: relative;
+            flex: 1;
+            height: 320px;
+        }
+
+        /* Panel pre budíky nad sebou */
+        .gauges-sidebar {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 15px;
+            width: 180px;
+        }
+
+        /* Nový štýl analógového budíka */
+        .gauge-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+            box-sizing: border-box;
+            position: relative;
+        }
+        .gauge-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+        .gauge-container {
+            position: relative;
+            width: 140px;
+            height: 85px;
+        }
+        .gauge-text {
+            position: absolute;
+            bottom: 5px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+            color: #212529;
+        }
+
         hr {
             border: 0;
             height: 1px;
             background: #ddd;
             margin: 30px 0;
         }
-        /* Konfigurácia */
         .config-section {
             text-align: center;
         }
@@ -107,7 +159,6 @@
             border-radius: 4px;
             text-align: center;
         }
-        /* Tlačidlá */
         .btn-submit {
             width: 100%;
             max-width: 450px;
@@ -146,7 +197,6 @@
         .btn-stop  { background-color: #e63946; }
         .btn-close { background-color: #6c757d; }
         
-        /* Status text */
         .status-text {
             text-align: center;
             margin-top: 25px;
@@ -160,6 +210,12 @@
 
 <div class="container">
     <h2>Monitorovanie a Riadenie Peltierovho okruhu</h2>
+
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
+        <a href="/stiahnut/csv" class="btn-action" style="background-color: #007bff; text-decoration: none; text-align: center; font-size: 14px; padding: 8px 16px;">
+            📥 Stiahnuť CSV archív
+        </a>
+    </div>
 
     <div class="grid-boxes">
         <div class="box">
@@ -180,8 +236,32 @@
         Aktuálne v ESP32 -> Kp: <span id="live_kp">--</span> | Ki: <span id="live_ki">--</span>
     </div>
 
-    <div class="chart-container">
-        <canvas id="peltierChart"></canvas>
+    <div class="visualization-row">
+        
+        <div class="chart-container">
+            <canvas id="peltierChart"></canvas>
+        </div>
+
+        <div class="gauges-sidebar">
+            
+            <div class="gauge-wrapper">
+                <div class="gauge-title">Teplota Okruhu (0-40°C)</div>
+                <div class="gauge-container">
+                    <canvas id="canvas_temp" width="140" height="85"></canvas>
+                    <div class="gauge-text" id="val_temp">0.0°C</div>
+                </div>
+            </div>
+
+            <div class="gauge-wrapper">
+                <div class="gauge-title">Výkon (PWM 0-255)</div>
+                <div class="gauge-container">
+                    <canvas id="canvas_pwm" width="140" height="85"></canvas>
+                    <div class="gauge-text" id="val_pwm">0</div>
+                </div>
+            </div>
+
+        </div>
+
     </div>
 
     <hr>
@@ -254,8 +334,8 @@
             maintainAspectRatio: false,
             scales: {
                 y: {
-                    min: 14,
-                    max: 32,
+                    min: 17,
+                    max: 30,
                     title: { display: true, text: 'Teplota (°C)' }
                 },
                 x: {
@@ -292,10 +372,17 @@
         // ZAMRZNUTIE GRAFU A TEPLOTY: SPUSTÍ SA IBA AK NIE JE STAV "CLOSE"
         // ============================================================
         if (data.stav_systemu !== "CLOSE") {
+            document.getElementById('live_teplota').innerText = "--.- °C";
+            vykresliAnalogovyBudik('canvas_temp', 'val_temp', 0, 0, 40, '#e63946', '°C');
+            vykresliAnalogovyBudik('canvas_pwm', 'val_pwm', 0, 0, 255, '#ffb703', '');
             
             // A. Aktualizácia boxu teploty (ak beží OPEN/START/STOP)
             if (data.teplota !== undefined) {
                 document.getElementById('live_teplota').innerText = parseFloat(data.teplota).toFixed(2) + " °C";
+                vykresliAnalogovyBudik('canvas_temp', 'val_temp', parseFloat(data.teplota), 0, 40, '#e63946', '°C');
+            }
+            if (data.peltier_pwm !== undefined) {
+                vykresliAnalogovyBudik('canvas_pwm', 'val_pwm', parseFloat(data.peltier_pwm), 0, 255, '#ffb703', '');
             }
 
             // B. Aktualizácia bodov v grafe
@@ -312,10 +399,77 @@
             peltierChart.data.datasets[1].data.push(globalSetpoint);
             
             peltierChart.update();
+            pridajRiadokDoZoznamu(terazCas, data.stav_systemu, data.teplota, globalSetpoint, data.peltier_pwm, data.kp, data.ki);
         } else {
             console.log("Vizuálna vrstva (box teploty aj graf) je kompletne pozastavená.");
         }
     });
+
+    // Inicializácia prázdnych budíkov (na 0 hodnotách) hneď po načítaní
+    window.addEventListener('DOMContentLoaded', () => {
+        vykresliAnalogovyBudik('canvas_temp', 'val_temp', 0, 0, 40, '#e63946', '°C');
+        vykresliAnalogovyBudik('canvas_pwm', 'val_pwm', 0, 0, 255, '#ffb703', '');
+    });
+
+       // ============================================================
+    // FUNKCIA PRE VYKRESLENIE SKUTOČNÉHO ANALÓGOVÉHO BUDÍKA
+    // ============================================================
+    function vykresliAnalogovyBudik(canvasId, textId, hodnota, min, max, farba, jednotka) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        const ctxNode = canvas.getContext('2d');
+        
+        // Vyčistenie plátna
+        ctxNode.clearRect(0, 0, canvas.width, canvas.height);
+        
+        let percento = (hodnota - min) / (max - min);
+        if (percento > 1) percento = 1;
+        if (percento < 0) percento = 0;
+
+        const cx = 70;  // Stred X
+        const cy = 75;  // Stred Y
+        const r = 55;   // Polomer oblúka
+
+        // 1. Vykreslenie sivého pozadia budíka
+        ctxNode.beginPath();
+        ctxNode.arc(cx, cy, r, Math.PI, 2 * Math.PI, false);
+        ctxNode.lineWidth = 14;
+        ctxNode.strokeStyle = '#e9ecef';
+        ctxNode.stroke();
+
+        // 2. Vykreslenie aktívnej hodnoty
+        if (percento > 0) {
+            ctxNode.beginPath();
+            let koncovyUhol = Math.PI + (percento * Math.PI);
+            ctxNode.arc(cx, cy, r, Math.PI, koncovyUhol, false);
+            ctxNode.lineWidth = 14;
+            ctxNode.strokeStyle = farba;
+            ctxNode.stroke();
+        }
+
+        // Aktualizácia textu pod budíkom
+        document.getElementById(textId).innerText = hodnota.toFixed(jednotka === '°C' ? 1 : 0) + jednotka;
+    }
+
+    function pridajRiadokDoZoznamu(cas, stav, teplota, setpoint, pwm, kp, ki) {
+        const tbody = document.getElementById('tabulka_body');
+        const novyRiadok = document.createElement('tr');
+
+        novyRiadok.innerHTML = `
+            <td style="padding: 8px; border: 1px solid #ddd;">${cas}</td>
+            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">${stav || 'CLOSE'}</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${teplota !== undefined && teplota !== null ? parseFloat(teplota).toFixed(2) + ' °C' : '--.-'}</td>
+            <td style="padding: 8px; border: 1px solid #ddd; color: #e63946; font-weight: 500;">${setpoint !== undefined && setpoint !== null ? parseFloat(setpoint).toFixed(1) + ' °C' : '--.-'}</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${pwm !== undefined && pwm !== null ? pwm : '0'}</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${kp || '--'} / ${ki || '--'}</td>
+        `;
+
+        tbody.insertBefore(novyRiadok, tbody.firstChild);
+
+        if (tbody.children.length > 10) {
+            tbody.removeChild(tbody.lastChild);
+        }
+    }
 
     // ============================================================
     // ODOSIELANIE PARAMETROV (Tlačidlo Uložiť)
