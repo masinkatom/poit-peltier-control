@@ -33,6 +33,60 @@
             margin-bottom: 25px;
             font-weight: bold;
         }
+        
+        /* NAVBAR */
+        .navbar {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 15px;
+        }
+        .btn-nav {
+            padding: 10px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #495057;
+            background-color: #ebf0f5;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-nav:hover {
+            background-color: #dee2e6;
+        }
+        .btn-nav.active {
+            background-color: #007bff;
+            color: white;
+        }
+
+        /* HISTÓRIA KONTROLY */
+        .history-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            border: 1px solid #e9ecef;
+        }
+        .history-controls label {
+            font-weight: bold;
+            font-size: 15px;
+        }
+        .history-controls select {
+            padding: 8px 12px;
+            font-size: 15px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            background: white;
+            cursor: pointer;
+        }
+
         .grid-boxes {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -64,7 +118,6 @@
             font-size: 14px;
         }
         
-        /* Hlavný riadok: Graf vľavo, budíky vpravo */
         .visualization-row {
             display: flex;
             align-items: stretch;
@@ -74,14 +127,12 @@
             width: 100%;
         }
 
-        /* Veľkosť grafu */
         .chart-container {
             position: relative;
             flex: 1;
-            height: 320px;
+            height: 350px;
         }
 
-        /* Panel pre budíky nad sebou */
         .gauges-sidebar {
             display: flex;
             flex-direction: column;
@@ -90,7 +141,6 @@
             width: 180px;
         }
 
-        /* Nový štýl analógového budíka */
         .gauge-wrapper {
             display: flex;
             flex-direction: column;
@@ -204,6 +254,35 @@
             font-size: 16px;
             color: #2a9d8f;
         }
+
+        .table-section {
+            width: 100%;
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+        .telemetry-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            background-color: white;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.05);
+        }
+        .telemetry-table th, .telemetry-table td {
+            padding: 12px;
+            border: 1px solid #e9ecef;
+            text-align: center;
+        }
+        .telemetry-table th {
+            background-color: #f8f9fa;
+            color: #495057;
+            font-weight: bold;
+        }
+        .telemetry-table tr:nth-child(even) {
+            background-color: #fdfdfd;
+        }
+        .telemetry-table tr:hover {
+            background-color: #f1f3f5;
+        }
     </style>
 </head>
 <body>
@@ -211,97 +290,200 @@
 <div class="container">
     <h2>Monitorovanie a Riadenie Peltierovho okruhu</h2>
 
-    <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
-        <a href="/stiahnut/csv" class="btn-action" style="background-color: #007bff; text-decoration: none; text-align: center; font-size: 14px; padding: 8px 16px;">
-            📥 Stiahnuť CSV archív
-        </a>
+    <div class="navbar">
+        <button id="btn_tab_live" class="btn-nav active" onclick="preklniTab('live')">Live dáta</button>
+        <button id="btn_tab_hist" class="btn-nav" onclick="preklniTab('hist')">Historické dáta</button>
     </div>
 
-    <div class="grid-boxes">
-        <div class="box">
-            <div class="box-title">Aktuálna Teplota</div>
-            <div class="box-value" id="live_teplota">--.- °C</div>
-        </div>
-        <div class="box">
-            <div class="box-title">Výkon Peltier (PWM)</div>
-            <div class="box-value" id="live_pwm">0</div>
-        </div>
-        <div class="box">
-            <div class="box-title">Stav systému</div>
-            <div class="box-value" id="live_stav">STOP</div>
-        </div>
-    </div>
-
-    <div class="info-bar">
-        Aktuálne v ESP32 -> Kp: <span id="live_kp">--</span> | Ki: <span id="live_ki">--</span>
-    </div>
-
-    <div class="visualization-row">
-        
-        <div class="chart-container">
-            <canvas id="peltierChart"></canvas>
+    <div id="tab_live_obsah" class="tab-data">
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
+            <button onclick="ulozitAkoJSON()" class="btn-action" style="background-color: #007bff; font-size: 14px; padding: 8px 16px; min-width: auto;">
+                💾 Uložiť telemetriu do JSON na serveri
+            </button>
         </div>
 
-        <div class="gauges-sidebar">
+        <div class="grid-boxes">
+            <div class="box">
+                <div class="box-title">Aktuálna Teplota</div>
+                <div class="box-value" id="live_teplota">--.- °C</div>
+            </div>
+            <div class="box">
+                <div class="box-title">Výkon Peltier (PWM)</div>
+                <div class="box-value" id="live_pwm">0</div>
+            </div>
+            <div class="box">
+                <div class="box-title">Stav systému</div>
+                <div class="box-value" id="live_stav">STOP</div>
+            </div>
+        </div>
+
+        <div class="info-bar">
+            Aktuálne v ESP32 -> Kp: <span id="live_kp">--</span> | Ki: <span id="live_ki">--</span>
+        </div>
+
+        <div class="visualization-row">
+            <div class="chart-container">
+                <canvas id="peltierChart"></canvas>
+            </div>
+
+            <div class="gauges-sidebar">
+                <div class="gauge-wrapper">
+                    <div class="gauge-title">Teplota Okruhu (0-40°C)</div>
+                    <div class="gauge-container">
+                        <canvas id="canvas_temp" width="140" height="85"></canvas>
+                        <div class="gauge-text" id="val_temp">0.0°C</div>
+                    </div>
+                </div>
+
+                <div class="gauge-wrapper">
+                    <div class="gauge-title">Výkon (PWM 0-255)</div>
+                    <div class="gauge-container">
+                        <canvas id="canvas_pwm" width="140" height="85"></canvas>
+                        <div class="gauge-text" id="val_pwm">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <hr>
+
+        <div class="config-section">
+            <div class="config-title">Konfigurácia parametrov</div>
             
-            <div class="gauge-wrapper">
-                <div class="gauge-title">Teplota Okruhu (0-40°C)</div>
-                <div class="gauge-container">
-                    <canvas id="canvas_temp" width="140" height="85"></canvas>
-                    <div class="gauge-text" id="val_temp">0.0°C</div>
-                </div>
+            <div class="form-group">
+                <label>Cieľová teplota (°C):</label>
+                <input type="number" id="input_setpoint" value="24" step="0.5">
+            </div>
+            <div class="form-group">
+                <label>Proporcionálna (Kp):</label>
+                <input type="number" id="input_kp" value="50">
+            </div>
+            <div class="form-group">
+                <label>Integračná (Ki):</label>
+                <input type="number" id="input_ki" value="0.4" step="0.1">
             </div>
 
-            <div class="gauge-wrapper">
-                <div class="gauge-title">Výkon (PWM 0-255)</div>
-                <div class="gauge-container">
-                    <canvas id="canvas_pwm" width="140" height="85"></canvas>
-                    <div class="gauge-text" id="val_pwm">0</div>
-                </div>
+            <button class="btn-submit" onclick="ulozitHodnoty()">💾 Uložiť hodnoty</button>
+
+            <div class="button-group">
+                <button class="btn-action btn-open" onclick="poslatPrikaz('OPEN')">OPEN</button>
+                <button class="btn-action btn-start" onclick="poslatPrikaz('START')">START</button>
+                <button class="btn-action btn-stop" onclick="poslatPrikaz('STOP')">STOP</button>
+                <button class="btn-action btn-close" onclick="poslatPrikaz('CLOSE')">CLOSE</button>
             </div>
 
+            <div class="status-text" id="status_msg">Status: Pripravený</div>
         </div>
 
+        <hr>
+
+        <div class="table-section">
+            <div class="config-title">Posledných 10 nameraných hodnôt</div>
+            <table class="telemetry-table">
+                <thead>
+                    <tr>
+                        <th>Čas</th>
+                        <th>Teplota (°C)</th>
+                        <th>Cieľ (°C)</th>
+                        <th>PWM (0-255)</th>
+                        <th>Stav</th>
+                    </tr>
+                </thead>
+                <tbody id="table_body">
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <hr>
-
-    <div class="config-section">
-        <div class="config-title">Konfigurácia parametrov</div>
+    <div id="tab_hist_obsah" class="tab-data" style="display: none;">
         
-        <div class="form-group">
-            <label>Cieľová teplota (°C):</label>
-            <input type="number" id="input_setpoint" value="24" step="0.5">
-        </div>
-        <div class="form-group">
-            <label>Proporcionálna (Kp):</label>
-            <input type="number" id="input_kp" value="50">
-        </div>
-        <div class="form-group">
-            <label>Integračná (Ki):</label>
-            <input type="number" id="input_ki" value="0.4" step="0.1">
+        <div class="history-controls">
+            <button onclick="nacitatHistorickeData()" class="btn-action" style="background-color: #2a9d8f; min-width: auto; padding: 10px 20px;">
+                🔄 Načítať históriu z JSON
+            </button>
+            
+            <label for="select_measurement">Vyberte meranie:</label>
+            <select id="select_measurement" onchange="zobrazitVybraneMeranie()">
+                <option value="">-- Najprv načítajte dáta --</option>
+            </select>
         </div>
 
-        <button class="btn-submit" onclick="ulozitHodnoty()">💾 Uložiť hodnoty</button>
-
-        <div class="button-group">
-            <button class="btn-action btn-open" onclick="poslatPrikaz('OPEN')">OPEN</button>
-            <button class="btn-action btn-start" onclick="poslatPrikaz('START')">START</button>
-            <button class="btn-action btn-stop" onclick="poslatPrikaz('STOP')">STOP</button>
-            <button class="btn-action btn-close" onclick="poslatPrikaz('CLOSE')">CLOSE</button>
+        <div class="grid-boxes">
+            <div class="box">
+                <div class="box-title">Posledná Teplota merania</div>
+                <div class="box-value" id="live_teplota_hist">--.- °C</div>
+            </div>
+            <div class="box">
+                <div class="box-title">Posledný Výkon (PWM)</div>
+                <div class="box-value" id="live_pwm_hist">--</div>
+            </div>
+            <div class="box">
+                <div class="box-title">Výsledný stav systému</div>
+                <div class="box-value" id="live_stav_hist">--</div>
+            </div>
         </div>
 
-        <div class="status-text" id="status_msg">Status: Pripravený</div>
+        <div class="info-bar">
+            Parametre merania -> Kp: <span id="live_kp_hist">--</span> | Ki: <span id="live_ki_hist">--</span>
+        </div>
+
+        <div class="visualization-row">
+            <div class="chart-container">
+                <canvas id="peltierChartHist"></canvas>
+            </div>
+        </div>
+
+        <hr>
+
+        <div class="table-section">
+            <div class="config-title" id="table_title_hist">Namerané dáta zvoleného merania</div>
+            <table class="telemetry-table">
+                <thead>
+                    <tr>
+                        <th>Čas</th>
+                        <th>Teplota (°C)</th>
+                        <th>Cieľ (°C)</th>
+                        <th>PWM (0-255)</th>
+                        <th>Stav</th>
+                    </tr>
+                </thead>
+                <tbody id="table_body_hist">
+                </tbody>
+            </table>
+        </div>
     </div>
+
 </div>
 
 <script>
     const socket = io();
     let globalSetpoint = 24;
+    let nacitaneMerania = []; // Sem uložíme dáta zo súboru measurements.json
 
-    // ============================================================
-    // INICIALIZÁCIA CHART.JS GRAFU
-    // ============================================================
+    // Funkcia na prepínanie tabov
+    function preklniTab(tabMeno) {
+        const liveObsah = document.getElementById('tab_live_obsah');
+        const histObsah = document.getElementById('tab_hist_obsah');
+        const btnLive = document.getElementById('btn_tab_live');
+        const btnHist = document.getElementById('btn_tab_hist');
+
+        if (tabMeno === 'live') {
+            liveObsah.style.display = 'block';
+            histObsah.style.display = 'none';
+            btnLive.classList.add('active');
+            btnHist.classList.remove('active');
+        } else {
+            liveObsah.style.display = 'none';
+            histObsah.style.display = 'block';
+            btnLive.classList.remove('active');
+            btnHist.classList.add('active');
+            peltierChartHist.resize();
+        }
+    }
+
+    // --- INICIALIZÁCIA GRAFOV ---
+    
+    // 1. Live Graf (Zostáva pôvodný)
     const ctx = document.getElementById('peltierChart').getContext('2d');
     const peltierChart = new Chart(ctx, {
         type: 'line',
@@ -333,111 +515,250 @@
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                y: {
-                    min: 17,
-                    max: 30,
-                    title: { display: true, text: 'Teplota (°C)' }
+                y: { min: 17, max: 30, title: { display: true, text: 'Teplota (°C)' } },
+                x: { title: { display: true, text: 'Čas' } }
+            }
+        }
+    });
+
+    // 2. Historický Graf (Pridaná tretia os a PWM dataset)
+    const ctxHist = document.getElementById('peltierChartHist').getContext('2d');
+    const peltierChartHist = new Chart(ctxHist, {
+        type: 'line',
+        data: {
+            labels: [], 
+            datasets: [
+                {
+                    label: 'Teplota (°C)',
+                    data: [],
+                    borderColor: '#007bff',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    yAxisID: 'y',
+                    tension: 0.2
                 },
-                x: {
-                    title: { display: true, text: 'Čas' }
+                {
+                    label: 'Cieľová Teplota (°C)',
+                    data: [],
+                    borderColor: '#e63946',
+                    borderDash: [5, 5],
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    yAxisID: 'y',
+                    tension: 0
+                },
+                {
+                    label: 'Výkon Peltier (PWM)',
+                    data: [],
+                    borderColor: '#ffb703',
+                    backgroundColor: 'rgba(255, 183, 3, 0.05)',
+                    borderWidth: 2,
+                    yAxisID: 'y1', // Naviazanie na vedľajšiu Y os vpravo
+                    tension: 0.2,
+                    fill: true
                 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: { display: true, text: 'Teplota (°C)' },
+                    min: 20,
+                    max: 27
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: { display: true, text: 'PWM Hodnota (0-255)' },
+                    min: 0,
+                    max: 255,
+                    grid: { drawOnChartArea: false } // Skryje mriežku z druhej osi, aby nerušila hlavnú
+                },
+                x: { title: { display: true, text: 'Čas záznamu' } }
             }
         }
     });
 
-    // ============================================================
-    // PRIJÍMANIE LIVE DÁT CEZ WEBSOCKETS (Z FLASKU)
-    // ============================================================
-    socket.on('aktualne_data', function(data) {
-        console.log("Prijaté dáta z ESP32:", data);
+    // --- LOGIKA PRE HISTORICKÉ DÁTA ---
+
+    // Načítanie súboru measurements.json
+    function nacitatHistorickeData() {
+        fetch('energia_historia.json')
+            .then(res => res.json())
+            .then(data => {
+                nacitaneMerania = data;
+                const selectElement = document.getElementById('select_measurement');
+                selectElement.innerHTML = '<option value="">-- Vyberte ID merania --</option>';
+
+                // Naplnenie select elementu ID-čkami meraní
+                data.forEach(item => {
+                    if (item.measurement) {
+                        const m = item.measurement;
+                        const opt = document.createElement('option');
+                        opt.value = m.id;
+                        opt.innerText = `Meranie ID: ${m.id} (${m.start_timestamp})`;
+                        selectElement.appendChild(opt);
+                    }
+                });
+                alert('História úspešne načítaná zo súboru!');
+            })
+            .catch(err => {
+                console.error("Chyba pri načítaní súboru JSON:", err);
+                alert('Nepodarilo sa načítať súbor energia_historia.json.');
+            });
+    }
+
+    // Zobrazenie vybraného merania (Graf + Tabuľka + Boxy)
+    function zobrazitVybraneMeranie() {
+        const idIdx = document.getElementById('select_measurement').value;
+        if (!idIdx) return;
+
+        // Nájdeme požadované meranie v poli
+        const zvolenyZaznam = nacitaneMerania.find(item => item.measurement && item.measurement.id == idIdx);
+        if (!zvolenyZaznam) return;
+
+        const mData = zvolenyZaznam.measurement.measurement_data;
         
-        // 1. Tieto systémové stavy sa aktualizujú VŽDY (chceme okamžite vidieť stav CLOSE a PWM 0)
-        if (data.peltier_pwm !== undefined) {
-            document.getElementById('live_pwm').innerText = data.peltier_pwm;
-        }
-        if (data.stav_systemu !== undefined) {
-            document.getElementById('live_stav').innerText = data.stav_systemu;
-        }
-        if (data.kp !== undefined) {
-            document.getElementById('live_kp').innerText = data.kp;
-        }
-        if (data.ki !== undefined) {
-            document.getElementById('live_ki').innerText = data.ki;
-        }
-        if (data.setpoint !== undefined) {
-            globalSetpoint = parseFloat(data.setpoint);
-        }
+        // Vyčistenie predchádzajúcich dát z grafu
+        peltierChartHist.data.labels = [];
+        peltierChartHist.data.datasets[0].data = [];
+        peltierChartHist.data.datasets[1].data = [];
+        peltierChartHist.data.datasets[2].data = [];
 
-        // ============================================================
-        // ZAMRZNUTIE GRAFU A TEPLOTY: SPUSTÍ SA IBA AK NIE JE STAV "CLOSE"
-        // ============================================================
-        if (data.stav_systemu !== "CLOSE") {
-            document.getElementById('live_teplota').innerText = "--.- °C";
-            vykresliAnalogovyBudik('canvas_temp', 'val_temp', 0, 0, 40, '#e63946', '°C');
-            vykresliAnalogovyBudik('canvas_pwm', 'val_pwm', 0, 0, 255, '#ffb703', '');
+        // Vyčistenie tabuľky
+        const tbody = document.getElementById('table_body_hist');
+        tbody.innerHTML = '';
+
+        // Prejdeme všetky záznamy merania
+        mData.forEach(bod => {
+            const cas = bod.timestamp.split(' ')[1] || bod.timestamp; // vytiahne len HH:MM:SS ak sa dá
+
+            // 1. Pridanie do grafu
+            peltierChartHist.data.labels.push(cas);
+            peltierChartHist.data.datasets[0].data.push(bod.temperature);
+            peltierChartHist.data.datasets[1].data.push(bod.setpoint);
+            peltierChartHist.data.datasets[2].data.push(bod.peltier_pwm);
+
+            // 2. Pridanie do tabuľky
+            const row = document.createElement('tr');
+            let color = bod.system_state === "START" ? "#2a9d8f" : (bod.system_state === "STOP" ? "#e63946" : "black");
             
-            // A. Aktualizácia boxu teploty (ak beží OPEN/START/STOP)
-            if (data.teplota !== undefined) {
-                document.getElementById('live_teplota').innerText = parseFloat(data.teplota).toFixed(2) + " °C";
-                vykresliAnalogovyBudik('canvas_temp', 'val_temp', parseFloat(data.teplota), 0, 40, '#e63946', '°C');
-            }
-            if (data.peltier_pwm !== undefined) {
-                vykresliAnalogovyBudik('canvas_pwm', 'val_pwm', parseFloat(data.peltier_pwm), 0, 255, '#ffb703', '');
-            }
+            row.innerHTML = `
+                <td>${bod.timestamp}</td>
+                <td style="font-weight: bold; color: #007bff;">${bod.temperature.toFixed(2)}</td>
+                <td>${bod.setpoint.toFixed(1)}</td>
+                <td>${bod.peltier_pwm}</td>
+                <td style="color: ${color}; font-weight: bold;">${bod.system_state || "Neznámy"}</td>
+            `;
+            tbody.appendChild(row); // Pridáva na koniec, aby to išlo chronologicky dole
+        });
 
-            // B. Aktualizácia bodov v grafe
-            const teraz = new Date().toLocaleTimeString();
+        peltierChartHist.update();
 
-            if (peltierChart.data.labels.length > 20) {
-                peltierChart.data.labels.shift();
-                peltierChart.data.datasets[0].data.shift(); 
-                peltierChart.data.datasets[1].data.shift(); 
+        // 3. Aktualizácia Grid Boxov podľa posledného bodu merania
+        if (mData.length > 0) {
+            const poslednyBod = mData[mData.length - 1];
+            document.getElementById('live_teplota_hist').innerText = poslednyBod.temperature.toFixed(2) + " °C";
+            document.getElementById('live_pwm_hist').innerText = poslednyBod.peltier_pwm;
+            document.getElementById('live_stav_hist').innerText = poslednyBod.system_state;
+            document.getElementById('live_kp_hist').innerText = poslednyBod.kp;
+            document.getElementById('live_ki_hist').innerText = poslednyBod.ki;
+        }
+    }
+
+
+    // --- PÔVODNÁ LOGIKA LIVE SOCKET DÁT (IBA PRE LIVE TAB) ---
+    socket.on('aktualne_data', function(data) {
+        if (typeof data === 'string') {
+            try { data = JSON.parse(data); } catch (e) { return; }
+        }
+        
+        try {
+            if (data.peltier_pwm !== undefined) document.getElementById('live_pwm').innerText = data.peltier_pwm;
+            if (data.stav_systemu !== undefined) document.getElementById('live_stav').innerText = data.stav_systemu;
+            if (data.kp !== undefined) document.getElementById('live_kp').innerText = data.kp;
+            if (data.ki !== undefined) document.getElementById('live_ki').innerText = data.ki;
+            if (data.setpoint !== undefined) globalSetpoint = parseFloat(data.setpoint);
+
+            if (data.stav_systemu !== "CLOSE") {
+                let temp = 0;
+                if (data.teplota !== undefined) temp = parseFloat(data.teplota);
+                else if (data.temperature !== undefined) temp = parseFloat(data.temperature);
+                
+                let pwm = data.peltier_pwm !== undefined ? parseFloat(data.peltier_pwm) : 0;
+
+                document.getElementById('live_teplota').innerText = temp.toFixed(2) + " °C";
+                vykresliAnalogovyBudik('canvas_temp', 'val_temp', temp, 0, 40, '#e63946', '°C');
+                vykresliAnalogovyBudik('canvas_pwm', 'val_pwm', pwm, 0, 255, '#ffb703', '');
+
+                const teraz = new Date().toLocaleTimeString();
+
+                if (peltierChart.data.labels.length > 20) {
+                    peltierChart.data.labels.shift();
+                    peltierChart.data.datasets[0].data.shift(); 
+                    peltierChart.data.datasets[1].data.shift(); 
+                }
+                peltierChart.data.labels.push(teraz);
+                peltierChart.data.datasets[0].data.push(temp);
+                peltierChart.data.datasets[1].data.push(globalSetpoint);
+                peltierChart.update();
+
+                const tbody = document.getElementById('table_body');
+                if (tbody) {
+                    const newRow = document.createElement('tr');
+                    let color = data.stav_systemu === "START" ? "#2a9d8f" : (data.stav_systemu === "STOP" ? "#e63946" : "black");
+                    
+                    newRow.innerHTML = `
+                        <td>${teraz}</td>
+                        <td style="font-weight: bold; color: #007bff;">${temp.toFixed(2)}</td>
+                        <td>${globalSetpoint.toFixed(1)}</td>
+                        <td>${pwm}</td>
+                        <td style="color: ${color}; font-weight: bold;">${data.stav_systemu || "Neznámy"}</td>
+                    `;
+                    tbody.insertBefore(newRow, tbody.firstChild);
+                    if (tbody.children.length > 10) tbody.removeChild(tbody.lastChild);
+                }
+            } else {
+                document.getElementById('live_teplota').innerText = "--.- °C";
+                vykresliAnalogovyBudik('canvas_temp', 'val_temp', 0, 0, 40, '#e63946', '°C');
+                vykresliAnalogovyBudik('canvas_pwm', 'val_pwm', 0, 0, 255, '#ffb703', '');
             }
-
-            peltierChart.data.labels.push(teraz);
-            peltierChart.data.datasets[0].data.push(parseFloat(data.teplota));
-            peltierChart.data.datasets[1].data.push(globalSetpoint);
-            
-            peltierChart.update();
-            pridajRiadokDoZoznamu(terazCas, data.stav_systemu, data.teplota, globalSetpoint, data.peltier_pwm, data.kp, data.ki);
-        } else {
-            console.log("Vizuálna vrstva (box teploty aj graf) je kompletne pozastavená.");
+        } catch (err) {
+            console.error("Chyba pri spracovaní Live dát:", err);
         }
     });
 
-    // Inicializácia prázdnych budíkov (na 0 hodnotách) hneď po načítaní
     window.addEventListener('DOMContentLoaded', () => {
         vykresliAnalogovyBudik('canvas_temp', 'val_temp', 0, 0, 40, '#e63946', '°C');
         vykresliAnalogovyBudik('canvas_pwm', 'val_pwm', 0, 0, 255, '#ffb703', '');
     });
 
-       // ============================================================
-    // FUNKCIA PRE VYKRESLENIE SKUTOČNÉHO ANALÓGOVÉHO BUDÍKA
-    // ============================================================
     function vykresliAnalogovyBudik(canvasId, textId, hodnota, min, max, farba, jednotka) {
         const canvas = document.getElementById(canvasId);
         if (!canvas) return;
         const ctxNode = canvas.getContext('2d');
-        
-        // Vyčistenie plátna
         ctxNode.clearRect(0, 0, canvas.width, canvas.height);
         
         let percento = (hodnota - min) / (max - min);
         if (percento > 1) percento = 1;
         if (percento < 0) percento = 0;
 
-        const cx = 70;  // Stred X
-        const cy = 75;  // Stred Y
-        const r = 55;   // Polomer oblúka
+        const cx = 70;  
+        const cy = 75;  
+        const r = 55;   
 
-        // 1. Vykreslenie sivého pozadia budíka
         ctxNode.beginPath();
         ctxNode.arc(cx, cy, r, Math.PI, 2 * Math.PI, false);
         ctxNode.lineWidth = 14;
         ctxNode.strokeStyle = '#e9ecef';
         ctxNode.stroke();
 
-        // 2. Vykreslenie aktívnej hodnoty
         if (percento > 0) {
             ctxNode.beginPath();
             let koncovyUhol = Math.PI + (percento * Math.PI);
@@ -446,47 +767,28 @@
             ctxNode.strokeStyle = farba;
             ctxNode.stroke();
         }
-
-        // Aktualizácia textu pod budíkom
         document.getElementById(textId).innerText = hodnota.toFixed(jednotka === '°C' ? 1 : 0) + jednotka;
     }
 
-    function pridajRiadokDoZoznamu(cas, stav, teplota, setpoint, pwm, kp, ki) {
-        const tbody = document.getElementById('tabulka_body');
-        const novyRiadok = document.createElement('tr');
-
-        novyRiadok.innerHTML = `
-            <td style="padding: 8px; border: 1px solid #ddd;">${cas}</td>
-            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">${stav || 'CLOSE'}</td>
-            <td style="padding: 8px; border: 1px solid #ddd;">${teplota !== undefined && teplota !== null ? parseFloat(teplota).toFixed(2) + ' °C' : '--.-'}</td>
-            <td style="padding: 8px; border: 1px solid #ddd; color: #e63946; font-weight: 500;">${setpoint !== undefined && setpoint !== null ? parseFloat(setpoint).toFixed(1) + ' °C' : '--.-'}</td>
-            <td style="padding: 8px; border: 1px solid #ddd;">${pwm !== undefined && pwm !== null ? pwm : '0'}</td>
-            <td style="padding: 8px; border: 1px solid #ddd;">${kp || '--'} / ${ki || '--'}</td>
-        `;
-
-        tbody.insertBefore(novyRiadok, tbody.firstChild);
-
-        if (tbody.children.length > 10) {
-            tbody.removeChild(tbody.lastChild);
-        }
+    function ulozitAkoJSON() {
+        document.getElementById('status_msg').innerText = "Generujem a ukladám JSON na serveri...";
+        fetch('/ulozit_json_server', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('status_msg').innerText = data.status === 'ok' ? "Status: " + data.sprava : "Status: Chyba: " + data.sprava;
+        })
+        .catch(err => {
+            document.getElementById('status_msg').innerText = "Status: Server neodpovedá.";
+        });
     }
 
-    // ============================================================
-    // ODOSIELANIE PARAMETROV (Tlačidlo Uložiť)
-    // ============================================================
     function ulozitHodnoty() {
         const setpointVal = parseFloat(document.getElementById('input_setpoint').value);
         const kpVal = parseFloat(document.getElementById('input_kp').value);
         const kiVal = parseFloat(document.getElementById('input_ki').value);
-
         globalSetpoint = setpointVal;
 
-        const payload = {
-            setpoint: setpointVal,
-            kp: kpVal,
-            ki: kiVal
-        };
-
+        const payload = { setpoint: setpointVal, kp: kpVal, ki: kiVal };
         document.getElementById('status_msg').innerText = "Odosielam parametre...";
 
         fetch('/odosli_prikaz', {
@@ -496,26 +798,15 @@
         })
         .then(res => res.json())
         .then(data => {
-            if(data.status === 'ok') {
-                document.getElementById('status_msg').innerText = "Status: Parametre úspešne uložené v ESP32!";
-            } else {
-                document.getElementById('status_msg').innerText = "Status: Chyba príkazu: " + data.sprava;
-            }
+            document.getElementById('status_msg').innerText = data.status === 'ok' ? "Status: Parametre úspešne uložené v ESP32!" : "Status: Chyba príkazu: " + data.sprava;
         })
         .catch(err => {
             document.getElementById('status_msg').innerText = "Status: ESP32 neodpovedá.";
-            console.error(err);
         });
     }
 
-    // ============================================================
-    // ODOSIELANIE AKČNÝCH PRÍKAZOV (OPEN, START, STOP, CLOSE)
-    // ============================================================
     function poslatPrikaz(prikazMeno) {
-        const payload = {
-            prikaz: prikazMeno
-        };
-
+        const payload = { prikaz: prikazMeno };
         document.getElementById('status_msg').innerText = "Posielam príkaz " + prikazMeno + "...";
 
         fetch('/odosli_prikaz', {
@@ -527,19 +818,15 @@
         .then(data => {
             if(data.status === 'ok') {
                 document.getElementById('status_msg').innerText = "Status: Stav zmenený na: " + prikazMeno;
-                if(prikazMeno !== "CLOSE") {
-                    document.getElementById('live_stav').innerText = prikazMeno;
-                }
+                if(prikazMeno !== "CLOSE") document.getElementById('live_stav').innerText = prikazMeno;
             } else {
                 document.getElementById('status_msg').innerText = "Status: Chyba: " + data.sprava;
             }
         })
         .catch(err => {
             document.getElementById('status_msg').innerText = "Status: Server/ESP nereaguje.";
-            console.error(err);
         });
     }
 </script>
-
 </body>
 </html>
