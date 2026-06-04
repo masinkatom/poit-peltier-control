@@ -1,5 +1,6 @@
 // potrebne veci
 sudo pip3 install eventlet - sfunkcnenie websocketu na pios
+sudo pip3 install mysql-connector-python
 
 // spustenie servera
 sudo python3 app.py
