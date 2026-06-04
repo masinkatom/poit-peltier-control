@@ -21,7 +21,7 @@ const char* ssid = "D209";
 const char* password = "pivolinD209"; 
 
 // IP adresa a port tvojho Flask servera
-const char* ws_host = "192.168.1.94"; 
+const char* ws_host = "192.168.1.113"; 
 const int ws_port = 5000;
 // URL cesta pre komunikáciu so Socket.io v4 backendom
 const char* ws_url = "/socket.io/?EIO=4&transport=websocket";
@@ -31,22 +31,27 @@ WebSocketsClient webSocket;
 // ==========================================
 // GLOBÁLNE PREMENNÉ REGULÁCIE (ZJEDNOTENÉ)
 // ==========================================
-String aktualny_stav = "STOP"; 
+String aktualny_stav = "CLOSE"; 
 
 float cielova_teplota = 24.0;  
-float konstant_kp = 50.0;     
-float konstant_ki = 0.4;      
+float konstant_kp = 100.0;     
+float konstant_ki = 0.5;      
 
 float temperature = 0;
 float error = 0;
 float integral = 0;
 float output = 0;
 
+// ROZDELENÉ ČASOVAČE
 unsigned long lastControl = 0;
-const int sampleTime = 5000; 
+const int sampleTimePID = 1000; // PID regulácia každú 1 sekundu
+
+unsigned long lastTelemetry = 0;
+const int sampleTimeWS = 5000;  // WebSockets telemetria každých 5 sekúnd
 
 // Deklarácie funkcií
-void spustiRegulaciuAOdosliData();
+void spustiRegulaciu();
+void odosliTelemetriu();
 void spracujRiadenie(String prijaty_json);
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length);
 
@@ -89,17 +94,25 @@ void setup() {
 void loop() {
   webSocket.loop(); // Udržiava spojenie a spracováva prichádzajúce dáta
 
-  if (millis() - lastControl >= sampleTime) {
-    lastControl = millis();
-    spustiRegulaciuAOdosliData();
+  unsigned long currentMillis = millis();
+
+  // 1. PID Regulácia beží každú 1 sekundu
+  if (currentMillis - lastControl >= sampleTimePID) {
+    lastControl = currentMillis;
+    spustiRegulaciu();
+  }
+
+  // 2. Odosielanie telemetrie beží každých 5 sekúnd
+  if (currentMillis - lastTelemetry >= sampleTimeWS) {
+    lastTelemetry = currentMillis;
+    odosliTelemetriu();
   }
 }
 
 // ==========================================
-// REÁLNY SENZOR -> REGULÁCIA -> TELEMETRIA CEZ WS
+// REÁLNY SENZOR -> PID REGULÁCIA (Každú 1s)
 // ==========================================
-void spustiRegulaciuAOdosliData() {
-  
+void spustiRegulaciu() {
   // 1. ČÍTANIE HODNÔT
   sensors.requestTemperatures();
   float dallasTemp = sensors.getTempCByIndex(0);
@@ -113,7 +126,7 @@ void spustiRegulaciuAOdosliData() {
 
   // 2. PI REGULÁTOR
   if (aktualny_stav == "START") {
-    error = abs(cielova_teplota - temperature);
+    error = -1 * (cielova_teplota - temperature);
     integral += error;
 
     float maxIntegral = 255.0 / konstant_ki;
@@ -132,11 +145,16 @@ void spustiRegulaciuAOdosliData() {
   }
 
   ledcWrite(PELTIER_PIN, (int)output);
+}
 
+// ==========================================
+// ODOSIELANIE TELEMETRIE CEZ WS (Každých 5s)
+// ==========================================
+void odosliTelemetriu() {
+  // Výpis do sériového portu (teraz iba raz za 5s, aby nespamoval konzolu každú sekundu)
   Serial.printf("[STAV: %s] Reálna Temp: %.2f °C | Setpoint: %.1f | Error: %.2f | Výkon PWM: %d\n",
                 aktualny_stav.c_str(), temperature, cielova_teplota, error, (int)output);
 
-  // 3. ODOSIELANIE TELEMETRIE CEZ WEBSOCKET
   if (webSocket.isConnected()) {
     char jsonBuffer[384];
     
@@ -162,23 +180,19 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
       break;
     case WStype_CONNECTED:
       Serial.printf("[WS] Úspešne pripojené k serveru: %s\n", payload);
-      // Socket.io engine vyžaduje úvodný potvrdzovací paket "40" po nadviazaní spojenia
       webSocket.sendTXT("40");
       break;
     case WStype_TEXT: {
       String msg = String((char*)payload);
       
-      // Detekcia, či ide o udalosť Socket.io s názvom "riadenie" (formát začína 42)
       if (msg.startsWith("42") && msg.indexOf("\"riadenie\"") != -1) {
         int jsonStart = msg.indexOf('{');
         if (jsonStart != -1) {
           String kluco_json = msg.substring(jsonStart);
           
-          // Odstránenie uzatváracej hranatej zátvorky ] na konci Socket.io správy
           if (kluco_json.endsWith("]")) {
             kluco_json = kluco_json.substring(0, kluco_json.length() - 1);
           }
-          // Posunieme vyčistený čistý JSON do tvojej parsovacej logiky
           spracujRiadenie(kluco_json);
         }
       }
@@ -190,7 +204,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 }
 
 // ==========================================
-// PARSOVANIE PRICHÁDZAJÚCICH DÁT Z WEBU (Pôvodná logika)
+// PARSOVANIE PRICHÁDZAJÚCICH DÁT Z WEBU
 // ==========================================
 void spracujRiadenie(String prijaty_json) {
   Serial.println("\n<- [Flask WS] Prijaté dáta z webu: " + prijaty_json);
