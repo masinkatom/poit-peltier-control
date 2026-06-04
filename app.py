@@ -3,6 +3,11 @@ from flask_socketio import SocketIO
 import mysql.connector
 import json
 import os
+import requests
+import urllib3
+
+# Vypnutie varovaní o SSL (z testovacieho skriptu)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
@@ -15,6 +20,10 @@ DB_CONFIG = {
     'database': 'PELTIER_CONTROL'
 }
 
+# THINGSBOARD CONFIGURATION
+THINGSBOARD_TOKEN = "fhP2L84hYkP9dPuvrtyj"
+THINGSBOARD_URL = f"https://eu.thingsboard.cloud/api/v1/{THINGSBOARD_TOKEN}/telemetry"
+
 current_measurement_id = None
 
 def get_db_connection():
@@ -24,6 +33,24 @@ def get_db_connection():
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+# ============================================================
+# POMOCNÁ FUNKCIA: ASYNCHRÓNNE ODOSIELANIE NA THINGSBOARD
+# ============================================================
+def odosli_na_thingsboard_background(payload):
+    try:
+        headers = {"Content-Type": "application/json"}
+        # Ponechaný timeout 5s a verify=False podľa tvojho testovacieho skriptu
+        response = requests.post(THINGSBOARD_URL, json=payload, headers=headers, timeout=5, verify=False)
+        if response.status_code == 200:
+            print(f"[ThingsBoard] Dáta úspešne odoslané do cloudu.")
+        elif response.status_code == 401:
+            print(f"[ThingsBoard CHYBA] Neautorizovaný prístup! Skontroluj TOKEN.")
+        else:
+            print(f"[ThingsBoard CHYBA] Server vrátil kód: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        print(f"[ThingsBoard CHYBA SIETE] Nepodarilo sa nadviazať spojenie: {e}")
 
 
 # ============================================================
@@ -111,7 +138,7 @@ def ulozit_json_server():
 
 
 # ============================================================
-# NOVÁ ROUTE: TU SI WEB VYŽIADA DATA PRE HISTORICKÝ GRAF
+# OBYČAJNÁ ROUTE: TU SI WEB VYŽIADA DATA PRE HISTORICKÝ GRAF
 # ============================================================
 @app.route('/nacitat_historiu', methods=['GET'])
 def nacitat_historiu():
@@ -150,11 +177,10 @@ def get_measurements():
             data = json.load(f)
         return jsonify(data)
     except FileNotFoundError:
-        # Ak súbor ešte neexistuje, vráti prázdne pole
         return jsonify([])
 
 # ============================================================
-# WEBSOCKET: PRIJÍMANIE LIVE TELEMETRIE Z ESP32 A LOGOVANIE DO DB
+# WEBSOCKET: PRIJÍMANIE LIVE TELEMETRIE Z ESP32, ZÁPIS DO DB A THINGSBOARD
 # ============================================================
 @socketio.on('telemetria')
 def handle_telemetria(data_z_esp):
@@ -165,6 +191,21 @@ def handle_telemetria(data_z_esp):
     stav_esp = data_z_esp.get("stav_systemu")
     print(f"<- [ESP32 Telemetria] Stav: {stav_esp} | Teplota: {data_z_esp.get('teplota')}°C")
     
+    # --------------------------------------------------------
+    # INTEGRÁCIA THINGSBOARD: Príprava a odoslanie balíčka v background tasku
+    # --------------------------------------------------------
+    tb_payload = {
+        "teplota": float(data_z_esp.get("teplota")) if data_z_esp.get("teplota") is not None else None,
+        "setpoint": float(data_z_esp.get("setpoint")) if data_z_esp.get("setpoint") is not None else None,
+        "peltier_pwm": data_z_esp.get("peltier_pwm"),
+        "kp": float(data_z_esp.get("kp")) if data_z_esp.get("kp") is not None else None,
+        "ki": float(data_z_esp.get("ki")) if data_z_esp.get("ki") is not None else None,
+        "stav_systemu": stav_esp
+    }
+    # Spustí sa na pozadí, nečaká sa na HTTP odpoveď ThingsBoardu
+    socketio.start_background_task(odosli_na_thingsboard_background, tb_payload)
+    # --------------------------------------------------------
+
     # Automatický štart/stop relácie merania v tabuľke Measurement
     if stav_esp == "START" and current_measurement_id is None:
         try:
